@@ -1,0 +1,13 @@
+[package]
+name = "bindata-impl"
+version = "0.1.0"
+authors = ["Christopher MacGown <chris@glassbear.com>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "0.2.3"
+quote = "0.4"
+syn = "0.12.14"
+walkdir = "2"

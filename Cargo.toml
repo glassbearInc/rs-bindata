@@ -1,0 +1,10 @@
+[package]
+name = "bindata"
+version = "0.1.0"
+authors = ["Christopher MacGown <chris@glassbear.com>"]
+
+[dependencies]
+phf = "0.7.21"
+proc-macro-hack = "0.4.0"
+quote = "0.4"
+bindata-impl = { path = "rs-bindata-impl" }
