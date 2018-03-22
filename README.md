@@ -1,4 +1,6 @@
-## rs-bindata
+[![](https://meritbadge.herokuapp.com/bindata)](https://crates.io/crates/bindata)
+
+## bindata
 
 ------------------------------------------------------------------------------
 
@@ -11,7 +13,13 @@ only been tested so far on rustc 1.24.1.
 
 ## Installation
 
-TODO
+This crate compiles on the stable version of the compiler. Add it to the
+dependencies in your `Cargo.toml` as so:
+
+```
+[dependencies]
+bindata = "0.1.0"
+```
 
 ## Usage
 
