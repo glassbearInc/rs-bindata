@@ -17,6 +17,23 @@ use syn::{Lit, LitStr, Meta, MetaNameValue, NestedMeta, MetaList };
 use quote::{Tokens, ToTokens};
 
 
+struct Asset(String, Bytes);
+impl ToTokens for Asset {
+    fn to_tokens(&self, tokens: &mut Tokens) {
+        let &Asset(ref path, ref contents) = self;
+        let asset_tokens = quote!{ #path => Some(vec!#contents), }.into();
+
+        tokens.append(TokenTree {
+            span: Span::def_site(),
+            kind: TokenNode::Group(
+                Delimiter::None,
+                asset_tokens,
+            ),
+        })
+    }
+}
+
+
 struct Bytes(Vec<u8>);
 impl ToTokens for Bytes {
     fn to_tokens(&self, tokens: &mut Tokens) {
@@ -35,14 +52,14 @@ impl ToTokens for Bytes {
 
 
 #[allow(unused)]
-fn read_bytes(filename: &Path) -> (String, Bytes) {
+fn read_bytes(filename: &Path) -> Asset {
     match File::open(filename) {
         Ok(file) => {
             let mut reader = BufReader::new(file);
             let mut contents = Vec::new();
             let _ = reader.read_to_end(&mut contents);
 
-            (filename.to_str().unwrap().to_owned(), Bytes(contents))
+            Asset(filename.to_str().unwrap().to_owned(), Bytes(contents))
         },
         Err(error) => {
             panic!(format!("could not open {:?}: {}", filename, error));
@@ -71,14 +88,13 @@ fn relativize_path(path: PathBuf) -> String {
 }
 
 
-fn walk<F: FnMut((String, Bytes)) -> Tokens>(path: PathBuf, quoter: F) -> Vec<Tokens> {
+fn walk(path: PathBuf) -> Vec<Asset> {
     let entries = walkdir::WalkDir::new(path.clone()).into_iter();
 
     entries.filter_map(|e| e.ok() ) // TODO:  Silently ignore errors?
            .filter(|e| e.file_type().is_file())
            .map(|f| read_bytes(f.path()))
-           .map(|(path, contents)| (relativize_path(path.into()), contents))
-           .map(quoter)
+           .map(|Asset(path, contents)| Asset(relativize_path(path.into()), contents))
            .collect()
 }
 
@@ -114,22 +130,19 @@ pub fn bindata_impl(input: TokenStream) -> TokenStream {
 
     let input: syn::DeriveInput = syn::parse(input).unwrap();
     let ident = input.ident;
-    let values: Vec<Tokens> = input.attrs.iter()
-                                         .filter_map(|a| a.interpret_meta())
-                                         .filter(|m| m.name() == "BinDataImplContent") 
-                                         .filter_map(parse_meta_list)
-                                         .flat_map(|bindata|
-                                              bindata.nested.into_iter()
-                                                            .filter_map(parse_nestedmeta_meta)
-                                                            .filter_map(parse_meta_namevalue)
-                                                            .map(|nv| nv.lit)
-                                                            .filter_map(parse_string_literal))
-                                                            .map(|l| l.value())
-                                         .flat_map(|path| 
-                                            walk(abs_path(path),
-                                                 |(n, v)| quote!{ #n => Some(vec!#v),}
-                                            ))
-                                         .collect();
+    let values: Vec<Asset> = input.attrs.iter()
+                                        .filter_map(|a| a.interpret_meta())
+                                        .filter(|m| m.name() == "BinDataImplContent") 
+                                        .filter_map(parse_meta_list)
+                                        .flat_map(|bindata|
+                                             bindata.nested.into_iter()
+                                                           .filter_map(parse_nestedmeta_meta)
+                                                           .filter_map(parse_meta_namevalue)
+                                                           .map(|nv| nv.lit)
+                                                           .filter_map(parse_string_literal))
+                                                           .map(|l| l.value())
+                                        .flat_map(|path| walk(abs_path(path)))
+                                        .collect();
     let expanded = quote! {
         impl #ident {
             fn get(&self, key: &str) -> Option<Vec<u8>> {
