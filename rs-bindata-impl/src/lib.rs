@@ -61,7 +61,12 @@ fn abs_path(path: String) -> PathBuf {
 }
 
 fn relativize_path(path: PathBuf) -> String {
-    let path = path.strip_prefix(&env::current_dir().unwrap()).unwrap().to_path_buf();
+    let current = env::current_dir().unwrap();
+    let path = match path.strip_prefix(&current) {
+        Ok(path) => path,
+        Err(_)   => &path,
+    };
+
     path.to_str().unwrap().to_string()
 }
 

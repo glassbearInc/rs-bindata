@@ -28,8 +28,12 @@ mod tests {
         bindata!("tests/data/a/");
     }
 
-    mod assets2 {
+    mod multiassets {
         bindata!("tests/data/a/", "tests/data/b/");
+    }
+
+    mod absolute_assets {
+        bindata!("/tmp");
     }
 
     #[test]
