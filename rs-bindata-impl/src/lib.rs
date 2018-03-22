@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use proc_macro::TokenStream;
 use proc_macro2::{TokenTree, TokenNode, Delimiter, Span};
+use syn::{Lit, LitStr, Meta, MetaNameValue, NestedMeta, MetaList };
 use quote::{Tokens, ToTokens};
 
 
@@ -59,59 +60,71 @@ fn abs_path(path: String) -> PathBuf {
     path
 }
 
-fn relativize_path(path: PathBuf) -> PathBuf {
-    path.strip_prefix(&env::current_dir().unwrap()).unwrap().to_path_buf()
+fn relativize_path(path: PathBuf) -> String {
+    let path = path.strip_prefix(&env::current_dir().unwrap()).unwrap().to_path_buf();
+    path.to_str().unwrap().to_string()
 }
 
 
-fn walk(path: PathBuf) -> Vec<(String, Bytes)> {
-    let mut result = Vec::new();
+fn walk<F: FnMut((String, Bytes)) -> Tokens>(path: PathBuf, quoter: F) -> Vec<Tokens> {
     let entries = walkdir::WalkDir::new(path.clone()).into_iter();
 
-    for entry in entries {
-        match entry {
-            Ok(entry) => {
-                if entry.file_type().is_file() {
-                    let (abspath, contents) = read_bytes(entry.path());
-                    let relpath = relativize_path(abspath.into());
-                    let relpath = relpath.to_str().unwrap();
-                    result.push((relpath.to_owned(), contents));
-                }
-            },
-            Err(error) => panic!(format!("error walking {:?}: {}", path, error)),
-        }
-    }
-
-    result 
+    entries.filter_map(|e| e.ok() ) // TODO:  Silently ignore errors?
+           .filter(|e| e.file_type().is_file())
+           .map(|f| read_bytes(f.path()))
+           .map(|(path, contents)| (relativize_path(path.into()), contents))
+           .map(quoter)
+           .collect()
 }
 
 #[proc_macro_derive(BinDataImpl, attributes(BinDataImplContent))]
 pub fn bindata_impl(input: TokenStream) -> TokenStream {
-    let mut values = Vec::new();
-    let input: syn::DeriveInput = syn::parse(input).unwrap();
-    let ident = input.ident;
-
-    for attr in input.attrs {
-        if let Some(meta) = attr.interpret_meta() {
-            if let syn::Meta::List(attrlist) = meta {
-                if attrlist.ident == "BinDataImplContent" {
-                    for nested in attrlist.nested {
-                        if let syn::NestedMeta::Meta(meta) = nested {
-                            if let syn::Meta::NameValue(nv) = meta {
-                                // TODO: Should we allow multiple terms?
-                                if let syn::Lit::Str(path) = nv.lit {
-                                    for (name, value) in walk(abs_path(path.value())) {
-                                        values.push(quote!{ #name => Some(vec!#value), });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    fn parse_meta_list(m: Meta) -> Option<MetaList> {
+        match m {
+            Meta::List(meta) => Some(meta),
+            _ => None,
         }
     }
 
+    fn parse_meta_namevalue(m: Meta) -> Option<MetaNameValue> {
+        match m {
+            Meta::NameValue(namevalue) => Some(namevalue),
+            _ => None,
+        }
+    }
+
+    fn parse_nestedmeta_meta(m: NestedMeta) -> Option<Meta> {
+        match m {
+            NestedMeta::Meta(meta) => Some(meta),
+            _ => None
+        }
+    }
+
+    fn parse_string_literal(l: Lit) -> Option<LitStr> {
+        match l {
+            Lit::Str(string) => Some(string),
+            _ => None,
+        }
+    }
+
+    let input: syn::DeriveInput = syn::parse(input).unwrap();
+    let ident = input.ident;
+    let values: Vec<Tokens> = input.attrs.iter()
+                                         .filter_map(|a| a.interpret_meta())
+                                         .filter(|m| m.name() == "BinDataImplContent") 
+                                         .filter_map(parse_meta_list)
+                                         .flat_map(|bindata|
+                                              bindata.nested.into_iter()
+                                                            .filter_map(parse_nestedmeta_meta)
+                                                            .filter_map(parse_meta_namevalue)
+                                                            .map(|nv| nv.lit)
+                                                            .filter_map(parse_string_literal))
+                                                            .map(|l| l.value())
+                                         .flat_map(|path| 
+                                            walk(abs_path(path),
+                                                 |(n, v)| quote!{ #n => Some(vec!#v),}
+                                            ))
+                                         .collect();
     let expanded = quote! {
         impl #ident {
             fn get(&self, key: &str) -> Option<Vec<u8>> {
