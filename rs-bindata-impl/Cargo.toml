@@ -1,6 +1,9 @@
 [package]
 name = "bindata-impl"
 version = "0.1.0"
+description = "Custom Derive proc-macro for rs-bindata"
+repository = "https://github.com/glassbearInc/rs-bindata"
+license = "Apache-2.0"
 authors = ["Christopher MacGown <chris@glassbear.com>"]
 
 [lib]
