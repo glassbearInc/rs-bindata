@@ -18,6 +18,7 @@
 extern crate bindata_impl;
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! bindata {
     ($($path:expr),*) => {
         #[allow(unused)]

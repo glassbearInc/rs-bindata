@@ -1,6 +1,6 @@
 [package]
 name = "bindata"
-version = "0.1.0"
+version = "0.1.1"
 description = "A macro to embed static assets in a binary that works on the stable release channel"
 repository = "https://github.com/glassbearInc/rs-bindata"
 license = "Apache-2.0"
