@@ -18,7 +18,8 @@ dependencies in your `Cargo.toml` as so:
 
 ```
 [dependencies]
-bindata = "0.1.0"
+bindata = "0.1.1"
+bindata-impl = "0.1.0"
 ```
 
 ## Usage
@@ -26,6 +27,8 @@ bindata = "0.1.0"
 ```
 #[macro_use]
 extern crate bindata;
+#[macro_use]
+extern crate bindata_impl;
 
 mod assets {
     bindata!("tests/data/a"); // A relative path from your package root.
@@ -43,6 +46,8 @@ You can specify multiple asset directories as well:
 ```
 #[macro_use]
 extern crate bindata;
+#[macro_use]
+extern crate bindata_impl;
 
 mod assets {
     bindata!("tests/data/a", "tests/data/b"); // A relative path from your package root.
